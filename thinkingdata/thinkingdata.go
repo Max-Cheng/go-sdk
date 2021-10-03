@@ -55,7 +55,12 @@ func New(c Consumer) TDAnalytics {
 }
 
 // GetSuperProperties 返回公共事件属性
+// 本质上是对ta.consumer 加锁避免脏读
+// 同时对consumer的Value做一次copy
+// 但实际上result在此可能会有内存逃逸的问题（离开作用域）
 func (ta *TDAnalytics) GetSuperProperties() map[string]interface{} {
+	// When we using mergeProperties function Only copy the value, not the pointer.
+	// So when we init the result map should give the capacity of the map.
 	result := make(map[string]interface{})
 	ta.mutex.RLock()
 	mergeProperties(result, ta.superProperties)
@@ -73,6 +78,7 @@ func (ta *TDAnalytics) SetSuperProperties(superProperties map[string]interface{}
 // ClearSuperProperties 清除公共事件属性
 func (ta *TDAnalytics) ClearSuperProperties() {
 	ta.mutex.Lock()
+	// Alloc new memory space to store map
 	ta.superProperties = make(map[string]interface{})
 	ta.mutex.Unlock()
 }
@@ -98,11 +104,14 @@ func (ta *TDAnalytics) track(accountId, distinctId, dataType, eventName, eventId
 	if len(eventId) == 0 && dataType != Track {
 		return errors.New("the event id must be provided")
 	}
-
+	// 本质上是对 ta 下的 map 做了一次值的Copy，目标地址为p
 	p := ta.GetSuperProperties()
 	p["#lib"] = LibName
 	p["#lib_version"] = SdkVersion
+	// 且对 p 信息进行进一步加工
+	// 包含了lib type 与 Version
 
+	// why we should merge again?
 	mergeProperties(p, properties)
 
 	return ta.add(accountId, distinctId, dataType, eventName, eventId, p)

@@ -16,12 +16,18 @@ const (
 
 var keyPattern, _ = regexp.Compile(KEY_PATTERN)
 
+// mergeProperties 对source的Value做了一份Copy
+// Copy 至 target
+// 本质上对不定Target的内存增长是不可控的(我们应该声明时注明cap?)
+
 func mergeProperties(target, source map[string]interface{}) {
+	// Better way to implement this function?
 	for k, v := range source {
 		target[k] = v
 	}
 }
 
+// extractTime formate time string to DATE_FORMAT
 func extractTime(p map[string]interface{}) string {
 	if t, ok := p["#time"]; ok {
 		delete(p, "#time")
